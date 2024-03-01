@@ -1,6 +1,13 @@
 from datasets import load_dataset
 import pandas as pd
 from llama_index.core import Document
+import qdrant_client
+from llama_index.vector_stores.qdrant import QdrantVectorStore
+from llama_index.core import StorageContext
+from llama_index.core import VectorStoreIndex, ServiceContext
+from llama_index.llms.openai import OpenAI
+from llama_index.embeddings.openai import OpenAIEmbedding
+from llama_index.core.node_parser import TokenTextSplitter
 
 import os
 import openai
@@ -32,106 +39,78 @@ for content in selected_papers['content']:
     doc = Document(text=content)
     documents.append(doc)
 
-from llama_index.core import VectorStoreIndex, ServiceContext
-from llama_index.llms.openai import OpenAI
-from llama_index.core import Settings
-from llama_index.embeddings.openai import OpenAIEmbedding
 
-Settings.chunk_size = 512
-Settings.chunk_overlap = 50
+# parse nodes
+parser = TokenTextSplitter(chunk_size = 512,
+                           chunk_overlap = 50)
+
+nodes = parser.get_nodes_from_documents(documents)
 
 embed_model = OpenAIEmbedding(model="text-embedding-3-large")
+
+# llm = OpenAI(model="gpt-4-1106-preview", temperature=0.1)
 llm = OpenAI(model="gpt-3.5-turbo", temperature=0.1)
+
 service_context = ServiceContext.from_defaults(
     llm=llm, embed_model=embed_model
 )
-
-index = VectorStoreIndex.from_documents(documents,
-                                        service_context=service_context)
-query_engine = index.as_query_engine()
-response = query_engine.query(
-    "Decribe pre-training process of BERT model"
-)
-print(str(response))
-
-# index.storage_context.persist(persist_dir="vector_store")
-
-eval_questions = []
-with open('test_questions.txt', 'r') as file:
-    for line in file:
-        # Remove newline character and convert to integer
-        item = line.strip()
-        print(item)
-        eval_questions.append(item)
-
-print(eval_questions)
-
-from trulens_eval import Tru, TruLlama
-tru = Tru()
-
-tru.reset_database()
-
-tru_recorder = get_prebuilt_trulens_recorder(query_engine,
-                                             app_id="Direct Query Engine")
-
-with tru_recorder as recording:
-    for question in eval_questions[:10]:
-        response = query_engine.query(question)
-
-records, feedback = tru.get_records_and_feedback(app_ids=[])
-records.head()
-tru.run_dashboard()
-
-
-
-
-
-# UTILS - to    be moved to a separate file
-from trulens_eval import (
-    Feedback,
-    TruLlama,
-    OpenAI
+client = qdrant_client.QdrantClient(
+    # otherwise set Qdrant instance address with:
+    url="https://e0ef990f-d23a-412d-8104-66300708e2ff.us-east4-0.gcp.cloud.qdrant.io:6333",
+    # set API KEY for Qdrant Cloud
+    api_key="ZaQf7Wh2IS3Vp9Tdn2HwCXw3Oyq3rxBMZkdf8rwVhuAKBwEYkjZ40A"
 )
 
-import numpy as np
-from trulens_eval.feedback import Groundedness
-openai = OpenAI()
-qa_relevance = (
-    Feedback(openai.relevance_with_cot_reasons, name="Answer Relevance")
-    .on_input_output()
+# client.delete_collection(collection_name="six_papers_arxiv_ai")
+vector_store = QdrantVectorStore(client=client, collection_name="six_papers_arxiv_ai")
+storage_context = StorageContext.from_defaults(vector_store=vector_store)
+index = VectorStoreIndex(nodes,
+                         storage_context=storage_context)
+
+query_engine = index.as_query_engine(llm = llm)
+# response = query_engine.query(
+#     "Decribe pre-training process of BERT model"
+# )
+# print(str(response))
+
+##### QUESTIONS ##### - so far keeping it here becase node object is needed (how to get from Qdrant??)
+keywords = ['llama']
+
+# Adjusted filter to account for TextNode objects
+included_nodes = [
+    node for node in nodes
+    if any(keyword in node.text.lower() for keyword in keywords)
+]
+
+# Convert the list to a DataFrame
+df_nodes = pd.DataFrame(included_nodes)  # Adjust column name(s) as needed
+
+# Export to Excel
+df_nodes.to_excel('nodes.xlsx', index=False)
+
+
+from llama_index.core.llama_dataset.generator import RagDatasetGenerator
+dataset_generator = RagDatasetGenerator(
+    nodes=included_nodes,
+    llm=llm,
+    num_questions_per_chunk=1,  # set the number of questions per nodes
 )
 
-qs_relevance = (
-    Feedback(openai.relevance_with_cot_reasons, name = "Context Relevance")
-    .on_input()
-    .on(TruLlama.select_source_nodes().node.text)
-    .aggregate(np.mean)
+rag_dataset = dataset_generator.generate_dataset_from_nodes()
+print(rag_dataset.to_pandas().head())
+
+# Assuming 'rag_dataset' is your dataset variable and it's already loaded with data
+df = rag_dataset.to_pandas()
+# Write the DataFrame to an Excel file
+df.to_excel('rag_dataset.xlsx', index=False)
+
+from llama_index.core.llama_pack import download_llama_pack
+
+RagEvaluatorPack = download_llama_pack("RagEvaluatorPack", "./pack")
+rag_evaluator = RagEvaluatorPack(
+    query_engine=query_engine, rag_dataset=rag_dataset, show_progress=True
 )
-
-#grounded = Groundedness(groundedness_provider=openai, summarize_provider=openai)
-grounded = Groundedness(groundedness_provider=openai)
-
-groundedness = (
-    Feedback(grounded.groundedness_measure_with_cot_reasons, name="Groundedness")
-        .on(TruLlama.select_source_nodes().node.text)
-        .on_output()
-        .aggregate(grounded.grounded_statements_aggregator)
+benchmark_df = await rag_evaluator.arun(
+    batch_size=20,  # batches the number of openai api calls to make
+    sleep_time_in_seconds=1,  # seconds to sleep before making an api call
 )
-
-feedbacks = [qa_relevance, qs_relevance, groundedness]
-
-def get_trulens_recorder(query_engine, feedbacks, app_id):
-    tru_recorder = TruLlama(
-        query_engine,
-        app_id=app_id,
-        feedbacks=feedbacks
-    )
-    return tru_recorder
-
-def get_prebuilt_trulens_recorder(query_engine, app_id):
-    tru_recorder = TruLlama(
-        query_engine,
-        app_id=app_id,
-        feedbacks=feedbacks
-        )
-    return tru_recorder
