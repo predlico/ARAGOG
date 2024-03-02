@@ -1,0 +1,46 @@
+{
+  "questions": [
+    "What novel dataset challenges state-of-the-art models in commonsense natural language inference with its adversarially filtered wrong answers?",
+    "How does the HellaSwag dataset achieve its complexity and why is it difficult for models despite being easy for humans?",
+    "What methodology underpins the creation of HellaSwag's challenging dataset?",
+    "Why do models trained on conventional datasets like SWAG struggle with the HellaSwag dataset?",
+    "What are the implications of models' performance on HellaSwag for future NLP research?",
+    "How does the adversarial filtering process contribute to the robustness of the HellaSwag dataset?",
+    "What does the performance gap between human and model accuracies on HellaSwag suggest about current NLP models?",
+    "In what way does HellaSwag expand upon the original domain of SWAG to increase dataset diversity?",
+    "How can we quantify the difficulty of HellaSwag for both humans and models?",
+    "What future directions does the HellaSwag paper propose for evolving NLP benchmarks?"
+  ],
+  "ground_truths": [
+    [
+      "HellaSwag is introduced as a new challenge dataset for commonsense natural language inference, designed to be trivial for humans but difficult for models, achieved through Adversarial Filtering."
+    ],
+    [
+      "HellaSwag's complexity comes from its use of Adversarial Filtering to create examples that are easy for humans to solve but hard for models, aiming for a 'Goldilocks' zone of difficulty."
+    ],
+    [
+      "Adversarial Filtering, where discriminators iteratively select challenging machine-generated wrong answers, underpins the creation of HellaSwag's dataset."
+    ],
+    [
+      "Models struggle with HellaSwag because it is designed to minimize dataset-specific biases that models have exploited, presenting a genuine test of commonsense reasoning."
+    ],
+    [
+      "The significant performance gap on HellaSwag suggests that current models, while advanced, still fall short of truly understanding commonsense reasoning as humans do."
+    ],
+    [
+      "The adversarial filtering process ensures that HellaSwag remains difficult for models by selecting only the most challenging wrong answers through iterative refinement."
+    ],
+    [
+      "The performance gap indicates that despite advancements, current models lack the deep comprehension necessary to match human-level understanding in commonsense reasoning."
+    ],
+    [
+      "By incorporating diverse sources like WikiHow articles, HellaSwag expands beyond SWAG's domain, increasing context diversity and example complexity."
+    ],
+    [
+      "The paper quantifies difficulty through model performance metrics, showing that even state-of-the-art models achieve below human-level accuracy on HellaSwag."
+    ],
+    [
+      "For evolving NLP benchmarks, the paper proposes a future where datasets and models co-evolve in an adversarial manner, continuously challenging and advancing model capabilities."
+    ]
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "questions": [
+    "What strategy reduces a BERT model's size while retaining its language understanding capabilities?",
+    "How does knowledge distillation affect the training of DistilBERT compared to BERT?",
+    "What is the impact of using a triple loss during DistilBERT's pre-training phase?",
+    "In terms of computational efficiency, how does DistilBERT compare to its teacher model, BERT?",
+    "How does DistilBERT's performance on the GLUE benchmark compare to BERT and ELMo models?",
+    "What modifications are made to DistilBERT's architecture from the original BERT model?",
+    "Why is DistilBERT considered suitable for on-device computations, such as mobile applications?",
+    "What are the key components of the triple loss used in DistilBERT's training?",
+    "How does DistilBERT manage to maintain a high level of performance with fewer parameters?",
+    "What are the benefits of distilling BERT into DistilBERT for NLP applications?"
+  ],
+  "ground_truths": [
+    [
+      "DistilBERT employs knowledge distillation, reducing BERT's size by 40% while retaining 97% of its language understanding capabilities."
+    ],
+    [
+      "Knowledge distillation trains DistilBERT to reproduce BERT's behavior, making it lighter and faster at inference time."
+    ],
+    [
+      "The triple loss combines language modeling, distillation, and cosine-distance losses to leverage inductive biases from BERT, enhancing DistilBERT's performance."
+    ],
+    [
+      "DistilBERT is 60% faster and requires less memory than BERT, making it more computationally efficient."
+    ],
+    [
+      "DistilBERT retains 97% of BERT's performance on the GLUE benchmark, outperforming ELMo and demonstrating high efficiency with 40% fewer parameters."
+    ],
+    [
+      "DistilBERT simplifies BERT's architecture by removing the token-type embeddings and pooler, and halving the number of layers."
+    ],
+    [
+      "Its smaller size and faster inference time enable DistilBERT to run effectively on devices with limited computational resources."
+    ],
+    [
+      "The triple loss in DistilBERT's training includes distillation loss, masked language modeling loss, and cosine embedding loss, optimizing performance and similarity to BERT."
+    ],
+    [
+      "By utilizing knowledge distillation and a triple loss training objective, DistilBERT achieves close to BERT's performance with significantly fewer parameters."
+    ],
+    [
+      "DistilBERT offers a cost-effective solution for deploying state-of-the-art NLP capabilities on edge devices, maintaining high performance with reduced computational demands."
+    ]
+  ]
+}

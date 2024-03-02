@@ -1,0 +1,46 @@
+{
+    "questions": [
+        "What does BERT stand for in natural language processing?",
+        "What makes BERT different from previous language representation models?",
+        "How does BERT achieve state-of-the-art results on numerous NLP tasks?",
+        "What are the two main tasks used in BERT's pre-training?",
+        "What is the model architecture of BERT based on?",
+        "How does BERT handle input representation for different tasks?",
+        "What dataset sizes were used to pre-train BERT?",
+        "How does BERT's fine-tuning process work?",
+        "Can you give examples of tasks where BERT has been applied successfully?",
+        "How does BERT's approach to language modeling differ from traditional models?"
+    ],
+    "ground_truths": [
+        [
+            "BERT stands for Bidirectional Encoder Representations from Transformers."
+        ],
+        [
+            "BERT is unique because it pre-trains deep bidirectional representations from unlabeled text by jointly conditioning on both left and right context in all layers."
+        ],
+        [
+            "BERT achieves state-of-the-art results by fine-tuning the pre-trained model with just one additional output layer for a wide range of tasks without substantial task-specific architecture modifications."
+        ],
+        [
+            "The two main tasks are the Masked LM (Language Model) task and the Next Sentence Prediction task."
+        ],
+        [
+            "BERT's model architecture is based on a multi-layer bidirectional Transformer encoder."
+        ],
+        [
+            "BERT uses a special [CLS] token at the beginning of the first sentence and a [SEP] token to separate sentences, with a segment embedding to distinguish different sentences in tasks involving pairs of sentences."
+        ],
+        [
+            "BERT was pre-trained using the BooksCorpus (800M words) and English Wikipedia (2,500M words)."
+        ],
+        [
+            "In fine-tuning, BERT is first initialized with pre-trained parameters, then all parameters are fine-tuned using labeled data from downstream tasks."
+        ],
+        [
+            "BERT has been applied successfully to tasks like question answering, natural language inference, and others."
+        ],
+        [
+            "Unlike traditional models that typically use a unidirectional approach, BERT uses a masked language model to enable the training of deep bidirectional representations."
+        ]
+    ]
+}
