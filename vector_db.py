@@ -12,7 +12,8 @@ from llama_index.core.node_parser import TokenTextSplitter
 import os
 import openai
 
-openai.api_key  = os.environ['OPENAI_API_KEY']
+openai.api_key = os.environ['OPENAI_API_KEY']
+
 
 # Load the dataset
 dataset = load_dataset("jamescalam/ai-arxiv")
@@ -22,12 +23,12 @@ df = pd.DataFrame(dataset['train'])
 
 # Titles of the papers you want to include
 selected_titles = [
-    "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
-    "Red teaming ChatGPT via Jailbreaking: Bias, Robustness, Reliability and Toxicity",
-    "LLaMA: Open and Efficient Foundation Language Models",
-    "Measuring Massive Multitask Language Understanding",
-    "DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter",
-    "HellaSwag: Can a Machine Really Finish Your Sentence?"
+    "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding"
+    # "Red teaming ChatGPT via Jailbreaking: Bias, Robustness, Reliability and Toxicity",
+    # "LLaMA: Open and Efficient Foundation Language Models",
+    # "Measuring Massive Multitask Language Understanding",
+    # "DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter",
+    # "HellaSwag: Can a Machine Really Finish Your Sentence?"
 ]
 
 # Filter the DataFrame to only include the specified titles
@@ -73,44 +74,80 @@ query_engine = index.as_query_engine(llm = llm)
 # )
 # print(str(response))
 
-##### QUESTIONS ##### - so far keeping it here becase node object is needed (how to get from Qdrant??)
-keywords = ['llama']
 
-# Adjusted filter to account for TextNode objects
-included_nodes = [
-    node for node in nodes
-    if any(keyword in node.text.lower() for keyword in keywords)
+
+
+
+from datasets import Dataset
+import json
+import os
+
+# Assuming all JSON files are in the same directory and have been downloaded to the local environment
+file_names = [
+    'questions_ground_truth_bert.json',
+    'questions_ground_truth_distilbert.json',
+    'questions_ground_truth_hellaswag.json',
+    'questions_ground_truth_llama.json',
+    'questions_ground_truth_mmlu.json',
+    'questions_ground_truth_red_teaming.json'
 ]
 
-# Convert the list to a DataFrame
-df_nodes = pd.DataFrame(included_nodes)  # Adjust column name(s) as needed
+# The directory where your JSON files are stored (this needs to be the path to your local directory)
+dir_path = 'eval_questions/'
 
-# Export to Excel
-df_nodes.to_excel('nodes.xlsx', index=False)
+# Dictionary to store all data from the JSON files
+all_data = {'questions': [], 'ground_truths': []}
 
+# Loop over the file names and load the content
+for file_name in file_names:
+    # Construct the full file path
+    file_path = os.path.join(dir_path, file_name)
 
-from llama_index.core.llama_dataset.generator import RagDatasetGenerator
-dataset_generator = RagDatasetGenerator(
-    nodes=included_nodes,
-    llm=llm,
-    num_questions_per_chunk=1,  # set the number of questions per nodes
+    # Load the JSON file and add its content to the all_data dictionary
+    with open(file_path, 'r') as json_file:
+        content = json.load(json_file)
+        all_data['questions'].extend(content["questions"])
+        all_data['ground_truths'].extend(content["ground_truths"])
+
+# Now you can access all the questions and ground truths with:
+questions = all_data["questions"]
+ground_truths = all_data["ground_truths"]
+answers = []
+contexts = []
+
+# Inference
+for query in questions:
+    query_result = query_engine.query(query)
+    answers.append(query_result.response)  # Assuming query_result itself contains the answer you need
+    # Extracting and appending text content from source_nodes for each query
+    contexts.append([node.node.text for node in query_result.source_nodes])
+
+# To dict
+rag_data = {
+    "question": questions,
+    "answer": answers,
+    "contexts": contexts,
+    "ground_truths": ground_truths
+}
+
+# Convert dict to dataset
+dataset = Dataset.from_dict(rag_data)
+
+from ragas import evaluate
+from ragas.metrics import (
+    faithfulness,
+    context_relevancy,
+    answer_correctness
+)
+# discuss which metrics to use - https://docs.ragas.io/en/v0.0.17/concepts/metrics/index.html
+result = evaluate(
+    dataset = dataset,
+    metrics=[
+        answer_correctness,
+        context_relevancy,
+        faithfulness
+    ],
 )
 
-rag_dataset = dataset_generator.generate_dataset_from_nodes()
-print(rag_dataset.to_pandas().head())
-
-# Assuming 'rag_dataset' is your dataset variable and it's already loaded with data
-df = rag_dataset.to_pandas()
-# Write the DataFrame to an Excel file
-df.to_excel('rag_dataset.xlsx', index=False)
-
-from llama_index.core.llama_pack import download_llama_pack
-
-RagEvaluatorPack = download_llama_pack("RagEvaluatorPack", "./pack")
-rag_evaluator = RagEvaluatorPack(
-    query_engine=query_engine, rag_dataset=rag_dataset, show_progress=True
-)
-benchmark_df = await rag_evaluator.arun(
-    batch_size=20,  # batches the number of openai api calls to make
-    sleep_time_in_seconds=1,  # seconds to sleep before making an api call
-)
+df = result.to_pandas()
+df.to_excel("eval_results.xlsx")
