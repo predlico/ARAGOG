@@ -1,0 +1,8 @@
+# Default ignored files
+/shelf/
+/workspace.xml
+/.idea
+*.xlsx
+/pack
+*.pyc
+config.json
