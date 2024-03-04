@@ -1,0 +1,24 @@
+{
+  "questions": [
+    "What is the total number of tasks covered by the massive multitask test designed to measure text model accuracy?",
+    "What was the accuracy of the largest GPT-3 model (175 billion parameters) on the multitask test?",
+    "How many questions in total were collected for the massive multitask test dataset?",
+    "What are the four broad disciplines into which the tasks of the multitask test are categorized?",
+    "Which model variant of GPT-3 achieved the highest average weighted accuracy across all tasks in the multitask test?",
+    "How does UnifiedQA's largest model's accuracy compare to GPT-3's largest model on the multitask test?",
+    "How many tasks in the multitask test are related to STEM subjects?",
+    "What was GPT-3's accuracy on US Foreign Policy, the task where it performed best?",
+    "What does the multitask test reveal about the difference in model performance between declarative and procedural knowledge tasks?"
+  ],
+  "ground_truths": [
+    "57 tasks",
+    "43.9%",
+    "15908 questions",
+    "Humanities, Social Science, STEM, and Other",
+    "GPT-3 X-Large (few-shot)",
+    "48.9% accuracy for UnifiedQA's largest model compared to 43.9% for GPT-3's largest model",
+    "Not specified directly, but the test covers various STEM subjects including physics, computer science, and mathematics",
+    "69% accuracy",
+    "Models perform better on tasks requiring declarative knowledge compared to those requiring procedural knowledge."
+  ]
+}

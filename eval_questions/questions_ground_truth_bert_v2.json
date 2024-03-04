@@ -1,0 +1,26 @@
+{
+  "questions": [
+    "What two phases constitute the BERT model's approach to language understanding tasks?",
+    "Which architectural feature distinguishes BERT's model for contextual understanding?",
+    "How does BERT's Masked Language Model (MLM) pre-training differ from traditional language modeling?",
+    "What role does the Next Sentence Prediction (NSP) task play in BERT's pre-training?",
+    "Describe how BERT processes input for both single sentences and sentence pairs.",
+    "Identify the three main elements of BERT's input representation.",
+    "How is bidirectional context encoded in BERT's architecture?",
+    "What are the two datasets BERT was pre-trained on, and what makes them significant?",
+    "What distinguishes BERTBase from BERTLarge in terms of architecture?",
+    "What impact did BERT have on NLP benchmarks according to the paper?"
+  ],
+  "ground_truths": [
+    "BERT's approach includes pre-training on a language model and fine-tuning for specific tasks.",
+    "BERT employs a bidirectional Transformer architecture, enabling context understanding from both directions.",
+    "MLM involves predicting randomly masked tokens from context, differing from sequential prediction in traditional models.",
+    "NSP enhances understanding of sentence relationships, beneficial for tasks requiring reasoning over sentence pairs.",
+    "BERT uses a unified representation for single sentences and pairs, marked by special tokens.",
+    "Input representation in BERT combines token embeddings, segmentation embeddings, and position embeddings.",
+    "BERT's bidirectionality comes from the Transformer model, processing each token in the context of all others.",
+    "BERT was pre-trained on the BooksCorpus and English Wikipedia, chosen for their broad coverage of language.",
+    "BERTBase and BERTLarge vary by layer count, hidden size, and self-attention heads, affecting model complexity.",
+    "BERT significantly improved performance across multiple NLP tasks, setting new state-of-the-art benchmarks."
+  ]
+}
