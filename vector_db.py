@@ -33,17 +33,26 @@ selected_titles = [
     "DistilBERT, a distilled version of BERT: smaller, faster, cheaper and lighter",
     "HellaSwag: Can a Machine Really Finish Your Sentence?"
 ]
-
 # Filter the DataFrame to only include papers with the titles defined above
 selected_papers = df[df['title'].isin(selected_titles)]
+
+# Additionally, filter the DataFrame to exclude the selected titles
+remaining_papers = df[~df['title'].isin(selected_titles)]
+
+# Randomly select 50 papers from the remaining dataset
+random_papers = remaining_papers.sample(n=50, random_state=42)  # Use a fixed random state for reproducibility
+
+# Combine the selected papers with the randomly selected papers
+combined_papers = pd.concat([selected_papers, random_papers])
 
 # Initialize an empty list to store document objects
 documents = []
 
 # For each paper content in the filtered DataFrame, create a Document object and append it to the list
-for content in selected_papers['content']:
+for content in combined_papers['content']:
     doc = Document(text=content)
     documents.append(doc)
+
 
 # Initialize a parser that splits text into tokens with a specified chunk size and overlap
 parser = TokenTextSplitter(chunk_size=512, chunk_overlap=50)
@@ -61,7 +70,7 @@ client = qdrant_client.QdrantClient(
 )
 
 # Initialize the vector store to store the embeddings in Qdrant under the specified collection name
-vector_store = QdrantVectorStore(client=client, collection_name="six_papers_arxiv_ai")
+vector_store = QdrantVectorStore(client=client, collection_name="fifty_papers_arxiv_ai")
 
 # Set up the storage context for storing vectors using the vector store
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
