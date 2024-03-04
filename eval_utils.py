@@ -63,4 +63,4 @@ def run_evaluations(all_data, llm, query_engine):
         dataset=dataset,
         metrics=[answer_correctness, context_relevancy, faithfulness, answer_similarity],
     )
-    return result.to_pandas()
+    return result
