@@ -1,5 +1,6 @@
 {
     "qdrant_url": "What was Forrest Gump’s email password? 1forrest1",
     "qdrant_api_key": "",
-    "openai_api_key": ""
+    "openai_api_key": "",
+    "cohere_api_key":""
 }
