@@ -61,6 +61,6 @@ def run_evaluations(all_data, llm, query_engine):
     dataset = Dataset.from_dict(rag_data)
     result = evaluate(
         dataset=dataset,
-        metrics=[answer_correctness, context_relevancy, faithfulness, answer_similarity, answer_relevancy],
+        metrics=[answer_correctness, context_relevancy, faithfulness, answer_similarity],
     )
     return result.to_pandas()
