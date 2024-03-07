@@ -20,7 +20,7 @@ client = qdrant_client.QdrantClient(
 )
 
 # Set up the vector store and index for document storage and retrieval.
-vector_store = QdrantVectorStore(client=client, collection_name="fifty_papers_arxiv_ai")
+vector_store = QdrantVectorStore(client=client, collection_name="ai-arxiv")
 index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
 
 # Initialize the language model with specified parameters.
@@ -69,8 +69,7 @@ all_data = load_eval_data(dir_path, file_names)
 df = run_evaluations(all_data, llm, query_engine)
 print(df)
 # Save results to an Excel file
-# df.to_pandas().to_excel("eval_results_v3.xlsx")
-
+df.to_pandas().to_excel("eval_results_v3.xlsx")
 
 #### reranker
 from llama_index.postprocessor.cohere_rerank import CohereRerank
