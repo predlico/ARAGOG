@@ -3,27 +3,24 @@ from llama_index.core import VectorStoreIndex, PromptTemplate
 import qdrant_client
 from llama_index.llms.openai import OpenAI
 import openai
-import json
 from tonic_validate import ValidateScorer, ValidateApi
-from tonic_validate.metrics import AnswerSimilarityMetric, RetrievalPrecisionMetric
+from tonic_validate.metrics import RetrievalPrecisionMetric
 from utils import make_get_llama_response, remove_nul_chars_from_run_data
 from llama_index.postprocessor.cohere_rerank import CohereRerank
 from llama_index.core.indices.query.query_transform import HyDEQueryTransform
 from llama_index.core.query_engine import TransformQueryEngine
+from utils import run_experiment, load_config
 
 ### SETUP --------------------------------------------------------------------------------------------------------------
-# Load configuration settings from a JSON file.
-with open('config.json') as config_file:
-    config = json.load(config_file)
+# Load the config file
+config = load_config('resources/config.json')
 
 # Set the OpenAI API key for authentication.
 openai.api_key = config['openai_api_key']
 tonic_validate_api_key = config['tonic_validate_api_key']
 tonic_validate_project_key = config['tonic_validate_project_key']
 tonic_validate_benchmark_key = config['tonic_validate_benchmark_key']
-
 validate_api = ValidateApi(tonic_validate_api_key)
-
 # Initialize the Qdrant client with configuration settings.
 client = qdrant_client.QdrantClient(
     url=config['qdrant_url'],
@@ -34,7 +31,7 @@ client = qdrant_client.QdrantClient(
 vector_store = QdrantVectorStore(client=client, collection_name="ai-arxiv")
 index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
 
-with open("text_qa_template.txt", 'r', encoding='utf-8') as file:
+with open("resources/text_qa_template.txt", 'r', encoding='utf-8') as file:
     text_qa_template_str = file.read()
 
 text_qa_template = PromptTemplate(text_qa_template_str)
@@ -47,75 +44,195 @@ scorer = ValidateScorer(metrics=[RetrievalPrecisionMetric()],
                         model_evaluator="gpt-3.5-turbo")
 
 ### NAIVE RAG ----------------------------------------------------------------------------------------------------------
-query_engine_naive = index.as_query_engine(llm=llm,
-                                           text_qa_template=text_qa_template,
-                                           similarity_top_k=3)
-
-get_llama_response_naive = make_get_llama_response(query_engine_naive)
-# Score the responses
-run_naive = scorer.score(benchmark, get_llama_response_naive)
-
-print(run_naive.overall_scores)
-
-remove_nul_chars_from_run_data(run_naive.run_data)
-validate_api.upload_run(tonic_validate_project_key,
-                        run = run_naive,
-                        run_metadata = {"approach": "naive"})
+query_engine_naive = index.as_query_engine(llm=llm, text_qa_template=text_qa_template, similarity_top_k=3)
+run_experiment("NAIVE RAG",
+               query_engine_naive,
+               scorer,
+               benchmark,
+               validate_api,
+               config['tonic_validate_project_key'],
+               upload_results=True)
 ### COHERE RERANK-------------------------------------------------------------------------------------------------------
 cohere_api_key = config['cohere_api_key']
-cohere_rerank = CohereRerank(api_key=cohere_api_key, top_n=2)
-
+cohere_rerank = CohereRerank(api_key=cohere_api_key, top_n=3) # need to be the same as k in naive rag to be comparable
 query_engine_rerank = index.as_query_engine(
     similarity_top_k=10,
     text_qa_template=text_qa_template,
     node_postprocessors=[cohere_rerank],
 )
 
-get_llama_response_rerank = make_get_llama_response(query_engine_rerank)
-run_rerank = scorer.score(benchmark, get_llama_response_rerank)
-
-print(run_rerank.overall_scores)
-
-remove_nul_chars_from_run_data(run_rerank.run_data)
-validate_api.upload_run(tonic_validate_project_key, run = run_rerank,
-                        run_metadata = {"approach": "cohere_rerank"})
+run_experiment("COHERE RERANK",
+               query_engine_rerank,
+               scorer,
+               benchmark,
+               validate_api,
+               config['tonic_validate_project_key'],
+               upload_results=False)
 ### HyDE----------------------------------------------------------------------------------------------------------------
 hyde = HyDEQueryTransform(include_original=True)
 query_engine_hyde = TransformQueryEngine(query_engine_naive, hyde)
 
-get_llama_response_hyde = make_get_llama_response(query_engine_hyde)
-
-run_hyde = scorer.score(benchmark, get_llama_response_hyde)
-
-print(run_hyde.overall_scores)
-
-remove_nul_chars_from_run_data(run_hyde.run_data)
-validate_api.upload_run(tonic_validate_project_key, run = run_hyde,
-                        run_metadata = {"approach": "HyDE"})
-
+run_experiment("HyDE",
+               query_engine_hyde,
+               scorer,
+               benchmark,
+               validate_api,
+               config['tonic_validate_project_key'],
+               upload_results=True)
 ### HyDE + RERANK ------------------------------------------------------------------------------------------------------
 query_engine_hyde_rerank = TransformQueryEngine(query_engine_rerank, hyde)
 
-get_llama_response_hyde_rerank = make_get_llama_response(query_engine_hyde_rerank)
-
-run_hyde_rerank = scorer.score(benchmark, get_llama_response_hyde_rerank)
-
-print(run_hyde_rerank.overall_scores)
-
-remove_nul_chars_from_run_data(run_hyde_rerank.run_data)
-validate_api.upload_run(tonic_validate_project_key, run = run_hyde_rerank,
-                        run_metadata = {"approach": "HyDE + Cohere rerank"})
-
+run_experiment("HyDE + Cohere Rerank",
+               query_engine_hyde_rerank,
+               scorer,
+               benchmark,
+               validate_api,
+               config['tonic_validate_project_key'],
+               upload_results=True)
 ### MMR ----------------------------------------------------------------------------------------------------------------
 query_engine_mmr = index.as_query_engine(vector_store_query_mode="mmr",
                                          similarity_top_k=3)
 
-get_llama_response_mmr = make_get_llama_response(query_engine_mmr)
+run_experiment("Maximal Marginal Relevance (MMR)",
+               query_engine_mmr,
+               scorer,
+               benchmark,
+               validate_api,
+               config['tonic_validate_project_key'],
+               upload_results=True)
+#### MULTI-QUERY -------------------------------------------------------------------------------------------------------
+from llama_index.core.retrievers import QueryFusionRetriever
+from llama_index.core.query_engine import RetrieverQueryEngine
+vector_retriever = index.as_retriever(similarity_top_k=3)
+retriever_multi_query = QueryFusionRetriever(
+    [vector_retriever],
+    similarity_top_k=3,
+    llm = llm,
+    num_queries=5,  # set this to 1 to disable query generation
+    mode="reciprocal_rerank",
+    use_async=False,
+    verbose=True
+)
 
-run_mmr = scorer.score(benchmark, get_llama_response_mmr)
+query_engine_multi_query = RetrieverQueryEngine.from_args(retriever_multi_query,
+                                                          verbose = True)
 
-print(run_mmr.overall_scores)
+run_experiment("Multi Query",
+               query_engine_multi_query,
+               scorer,
+               benchmark,
+               validate_api,
+               config['tonic_validate_project_key'],
+               upload_results=True)
+#### MULTI-QUERY + RERANK ----------------------------------------------------------------------------------------------
+from llama_index.core.retrievers import QueryFusionRetriever
+from llama_index.core.query_engine import RetrieverQueryEngine
+vector_retriever = index.as_retriever(similarity_top_k=3)
+retriever_multi_query_rerank = QueryFusionRetriever(
+    [vector_retriever],
+    similarity_top_k=3,
+    llm = llm,
+    num_queries=5,  # set this to 1 to disable query generation
+    mode="simple",
+    use_async=False,
+    verbose=True
+)
 
-remove_nul_chars_from_run_data(run_mmr.run_data)
-validate_api.upload_run(tonic_validate_project_key, run = run_mmr,
-                        run_metadata = {"approach": "MMR"})
+query_engine_multi_query_rerank = RetrieverQueryEngine.from_args(retriever_multi_query_rerank,
+                                                          verbose = True,
+                                                          node_postprocessors=[cohere_rerank])
+
+run_experiment("Multi Query + Cohere rerank + simple fusion",
+               query_engine_multi_query,
+               scorer,
+               benchmark,
+               validate_api,
+               config['tonic_validate_project_key'],
+               upload_results=True)
+
+# Unfinished, needs some more love
+#### Hybrid search -----------------------------------------------------------------------------------------------------
+# QDRANT DOESNT WORK WITH BM25 - https://github.com/run-llama/llama_index/issues/9024
+from llama_index.retrievers.bm25 import BM25Retriever
+from datasets import load_dataset
+import pandas as pd
+from llama_index.core import Document
+from llama_index.core.node_parser import TokenTextSplitter
+# Load the AI research papers dataset from the Hugging Face datasets library
+# dataset = load_dataset("jamescalam/ai-arxiv")
+# # Convert the 'train' split of the dataset into a pandas DataFrame for easier manipulation
+# df = pd.DataFrame(dataset['train'])
+# documents = []
+# # For each paper content in the filtered DataFrame, create a Document object and append it to the list
+# for content in df['content']:
+#     doc = Document(text=content)
+#     documents.append(doc)
+# parser = TokenTextSplitter(chunk_size=512, chunk_overlap=50)
+# index = VectorStoreIndex.from_documents(documents, transformations=[parser])
+#
+# vector_retriever = index.as_retriever(similarity_top_k=3)
+# bm25_retriever = BM25Retriever.from_defaults(
+#     docstore=index.docstore, similarity_top_k=2
+# )
+
+retriever_hybrid = QueryFusionRetriever(
+    [vector_retriever, bm25_retriever],
+    similarity_top_k=2,
+    num_queries=1,  # set this to 1 to disable query generation
+    mode="reciprocal_rerank",
+    verbose=True
+)
+
+query_engine_hybrid = RetrieverQueryEngine.from_args(retriever_hybrid,
+                                                     verbose = True)
+
+get_llama_response_hybrid = make_get_llama_response(query_engine_hybrid)
+run_hybrid= scorer.score(benchmark, get_llama_response_hybrid)
+print(run_hybrid.overall_scores)
+
+remove_nul_chars_from_run_data(run_hybrid.run_data)
+validate_api.upload_run(tonic_validate_project_key, run = run_hybrid,
+                        run_metadata = {"approach": "Hybrid (vector + BM25)"})
+
+#### Hybrid search + RERANK --------------------------------------------------------------------------------------------
+retriever_hybrid = QueryFusionRetriever(
+    [vector_retriever, bm25_retriever],
+    similarity_top_k=2,
+    num_queries=1,  # set this to 1 to disable query generation
+    mode="simple",
+    verbose=True
+)
+
+query_engine_hybrid_rerank = RetrieverQueryEngine.from_args(retriever_hybrid,
+                                                     verbose = True,
+                                                     node_postprocessors=[cohere_rerank])
+
+get_llama_response_hybrid_rerank = make_get_llama_response(query_engine_hybrid_rerank)
+run_hybrid_rerank= scorer.score(benchmark, get_llama_response_hybrid_rerank)
+print(run_hybrid_rerank.overall_scores)
+
+remove_nul_chars_from_run_data(run_hybrid_rerank.run_data)
+validate_api.upload_run(tonic_validate_project_key, run = run_hybrid_rerank,
+                        run_metadata = {"approach": "Hybrid (vector + BM25) + Cohere rerank"})
+
+#### Hybrid search + RERANK + Multi query-------------------------------------------------------------------------------
+retriever_hybrid = QueryFusionRetriever(
+    [vector_retriever, bm25_retriever],
+    similarity_top_k=2,
+    num_queries=5,  # set this to 1 to disable query generation
+    mode="simple",
+    verbose=True
+)
+
+query_engine_hybrid_rerank_mq = RetrieverQueryEngine.from_args(retriever_hybrid,
+                                                     verbose = True,
+                                                     node_postprocessors=[cohere_rerank])
+
+get_llama_response_hybrid_rerank_mq = make_get_llama_response(query_engine_hybrid_rerank_mq)
+run_hybrid_rerank_mq= scorer.score(benchmark, get_llama_response_hybrid_rerank_mq)
+print(run_hybrid_rerank_mq.overall_scores)
+
+remove_nul_chars_from_run_data(run_hybrid_rerank_mq.run_data)
+validate_api.upload_run(tonic_validate_project_key, run = run_hybrid_rerank_mq,
+                        run_metadata = {"approach": "Hybrid (vector + BM25) + Cohere rerank + Multi query"})
+
