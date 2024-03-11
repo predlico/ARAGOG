@@ -4,12 +4,15 @@ import qdrant_client
 from llama_index.llms.openai import OpenAI
 import openai
 from tonic_validate import ValidateScorer, ValidateApi
-from tonic_validate.metrics import RetrievalPrecisionMetric
+from tonic_validate.metrics import RetrievalPrecisionMetric, AnswerSimilarityMetric
 from utils import make_get_llama_response, remove_nul_chars_from_run_data
 from llama_index.postprocessor.cohere_rerank import CohereRerank
 from llama_index.core.indices.query.query_transform import HyDEQueryTransform
 from llama_index.core.query_engine import TransformQueryEngine
 from utils import run_experiment, load_config
+from llama_index.core.retrievers import QueryFusionRetriever
+from llama_index.core.query_engine import RetrieverQueryEngine
+import pandas as pd
 
 ### SETUP --------------------------------------------------------------------------------------------------------------
 # Load the config file
@@ -36,119 +39,91 @@ with open("resources/text_qa_template.txt", 'r', encoding='utf-8') as file:
 
 text_qa_template = PromptTemplate(text_qa_template_str)
 # Initialize the language model with specified parameters.
-llm = OpenAI(model="gpt-3.5-turbo", temperature=0.1)
+llm = OpenAI(model="gpt-3.5-turbo", temperature=0.0)
 
 benchmark = validate_api.get_benchmark(tonic_validate_benchmark_key)
 
 scorer = ValidateScorer(metrics=[RetrievalPrecisionMetric()],
                         model_evaluator="gpt-3.5-turbo")
 
-### NAIVE RAG ----------------------------------------------------------------------------------------------------------
+### Define query engines -------------------------------------------------------------------------------------------------
+# Naive RAG
 query_engine_naive = index.as_query_engine(llm=llm, text_qa_template=text_qa_template, similarity_top_k=3)
-run_experiment("NAIVE RAG",
-               query_engine_naive,
-               scorer,
-               benchmark,
-               validate_api,
-               config['tonic_validate_project_key'],
-               upload_results=True)
-### COHERE RERANK-------------------------------------------------------------------------------------------------------
-cohere_api_key = config['cohere_api_key']
-cohere_rerank = CohereRerank(api_key=cohere_api_key, top_n=3) # need to be the same as k in naive rag to be comparable
+
+# Cohere Rerank
+cohere_rerank = CohereRerank(api_key=config['cohere_api_key'], top_n=3)  # Ensure top_n matches k in naive RAG for comparability
 query_engine_rerank = index.as_query_engine(
     similarity_top_k=10,
     text_qa_template=text_qa_template,
     node_postprocessors=[cohere_rerank],
 )
 
-run_experiment("COHERE RERANK",
-               query_engine_rerank,
-               scorer,
-               benchmark,
-               validate_api,
-               config['tonic_validate_project_key'],
-               upload_results=False)
-### HyDE----------------------------------------------------------------------------------------------------------------
+# HyDE
 hyde = HyDEQueryTransform(include_original=True)
 query_engine_hyde = TransformQueryEngine(query_engine_naive, hyde)
 
-run_experiment("HyDE",
-               query_engine_hyde,
-               scorer,
-               benchmark,
-               validate_api,
-               config['tonic_validate_project_key'],
-               upload_results=True)
-### HyDE + RERANK ------------------------------------------------------------------------------------------------------
+# HyDE + Cohere Rerank
 query_engine_hyde_rerank = TransformQueryEngine(query_engine_rerank, hyde)
 
-run_experiment("HyDE + Cohere Rerank",
-               query_engine_hyde_rerank,
-               scorer,
-               benchmark,
-               validate_api,
-               config['tonic_validate_project_key'],
-               upload_results=True)
-### MMR ----------------------------------------------------------------------------------------------------------------
-query_engine_mmr = index.as_query_engine(vector_store_query_mode="mmr",
-                                         similarity_top_k=3)
+# Maximal Marginal Relevance (MMR)
+query_engine_mmr = index.as_query_engine(vector_store_query_mode="mmr", similarity_top_k=3)
 
-run_experiment("Maximal Marginal Relevance (MMR)",
-               query_engine_mmr,
-               scorer,
-               benchmark,
-               validate_api,
-               config['tonic_validate_project_key'],
-               upload_results=True)
-#### MULTI-QUERY -------------------------------------------------------------------------------------------------------
-from llama_index.core.retrievers import QueryFusionRetriever
-from llama_index.core.query_engine import RetrieverQueryEngine
+# Multi Query
 vector_retriever = index.as_retriever(similarity_top_k=3)
 retriever_multi_query = QueryFusionRetriever(
     [vector_retriever],
     similarity_top_k=3,
-    llm = llm,
-    num_queries=5,  # set this to 1 to disable query generation
+    llm=llm,
+    num_queries=5,
     mode="reciprocal_rerank",
     use_async=False,
     verbose=True
 )
+query_engine_multi_query = RetrieverQueryEngine.from_args(retriever_multi_query, verbose=True)
 
-query_engine_multi_query = RetrieverQueryEngine.from_args(retriever_multi_query,
-                                                          verbose = True)
-
-run_experiment("Multi Query",
-               query_engine_multi_query,
-               scorer,
-               benchmark,
-               validate_api,
-               config['tonic_validate_project_key'],
-               upload_results=True)
-#### MULTI-QUERY + RERANK ----------------------------------------------------------------------------------------------
-from llama_index.core.retrievers import QueryFusionRetriever
-from llama_index.core.query_engine import RetrieverQueryEngine
-vector_retriever = index.as_retriever(similarity_top_k=3)
+# Multi Query + Cohere rerank + simple fusion
 retriever_multi_query_rerank = QueryFusionRetriever(
     [vector_retriever],
-    similarity_top_k=3,
-    llm = llm,
-    num_queries=5,  # set this to 1 to disable query generation
+    similarity_top_k=10,
+    llm=llm,
+    num_queries=5,
     mode="simple",
     use_async=False,
     verbose=True
 )
+query_engine_multi_query_rerank = RetrieverQueryEngine.from_args(retriever_multi_query_rerank, verbose=True, node_postprocessors=[cohere_rerank])
 
-query_engine_multi_query_rerank = RetrieverQueryEngine.from_args(retriever_multi_query_rerank,
-                                                          verbose = True,
-                                                          node_postprocessors=[cohere_rerank])
+# Dictionary of experiments, now referencing the predefined query engine objects
+experiments = {
+    "NAIVE RAG": query_engine_naive,
+    "COHERE RERANK": query_engine_rerank,
+    "HyDE": query_engine_hyde,
+    "HyDE + Cohere Rerank": query_engine_hyde_rerank,
+    "Maximal Marginal Relevance (MMR)": query_engine_mmr,
+    "Multi Query": query_engine_multi_query,
+    "Multi Query + Cohere rerank + simple fusion": query_engine_multi_query_rerank,
+    # Add more experiments as needed
+}
 
-run_experiment("Multi Query + Cohere rerank + simple fusion",
-               query_engine_multi_query,
-               scorer,
-               benchmark,
-               validate_api,
-               config['tonic_validate_project_key'],
-               upload_results=True)
+# Initialize an empty DataFrame to collect results from all experiments
+all_experiments_results_df = pd.DataFrame(columns=['Run', 'Experiment', 'OverallScores'])
+
+# Loop through each experiment configuration, run it, and collect results
+for experiment_name, query_engine in experiments.items():
+    experiment_results_df = run_experiment(experiment_name,
+                                            query_engine,
+                                            scorer,
+                                            benchmark,
+                                            validate_api,
+                                            config['tonic_validate_project_key'],
+                                            upload_results=True,
+                                            runs=5)  # Adjust the number of runs as needed
+
+    # Append the results of this experiment to the master DataFrame
+    all_experiments_results_df = pd.concat([all_experiments_results_df, experiment_results_df], ignore_index=True)
+
+# Check for normality and homogeneity of variances
+# Skipping those checks here for brevity, but you should perform them in your analysis
 
 # Unfinished, needs some more love
 #### Hybrid search -----------------------------------------------------------------------------------------------------
