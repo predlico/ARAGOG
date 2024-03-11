@@ -1,6 +1,6 @@
-# RAG Experiment Repository
+# ARAGOG - Advanced Retrieval Augmented Generation Output Grading :spider:
 
-This repository contains code and resources for our RAG (Retrieval-Augmented Generation) experiment. We are comparing different RAG approaches on the same dataset.
+This repository contains code and resources for our RAG (Retrieval-Augmented Generation) experiments. We are comparing different RAG approaches on the same dataset.
 
 ## General Guidelines
 
