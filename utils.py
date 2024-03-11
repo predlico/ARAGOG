@@ -1,4 +1,5 @@
 import json
+import pandas as pd
 def remove_nul_chars_from_string(s):
     """Remove NUL characters from a single string."""
     return s.replace('\x00', '')
@@ -37,19 +38,30 @@ def load_config(config_path):
         raise ValueError("Config file is missing required keys.")
     return config
 
-def run_experiment(experiment_name,
-                   query_engine,
-                   scorer,
-                   benchmark,
-                   validate_api,
-                   project_key,
-                   upload_results=True):
-    get_llama_response_func = make_get_llama_response(query_engine)
-    run = scorer.score(benchmark, get_llama_response_func)
-    print(f"{experiment_name} Overall Scores:", run.overall_scores)
-    remove_nul_chars_from_run_data(run.run_data)
+def run_experiment(experiment_name, query_engine, scorer, benchmark, validate_api, project_key, upload_results=True, runs=5):
+    # List to store results dictionaries
+    results_list = []
 
-    if upload_results:
-        validate_api.upload_run(project_key, run=run, run_metadata={"approach": experiment_name})
-    else:
-        print(f"Skipping upload for {experiment_name}.")
+    for i in range(runs):
+        get_llama_response_func = make_get_llama_response(query_engine)
+        run = scorer.score(benchmark,
+                           get_llama_response_func,
+                           callback_parallelism=3,
+                           scoring_parallelism=3)
+        print(f"{experiment_name} Run {i+1} Overall Scores:", run.overall_scores)
+        remove_nul_chars_from_run_data(run.run_data)
+
+        # Add this run's results to the list
+        results_list.append({'Run': i+1, 'Experiment': experiment_name, 'OverallScores': run.overall_scores})
+
+        if upload_results:
+            validate_api.upload_run(project_key, run=run, run_metadata={"approach": experiment_name, "run_number": i+1})
+        else:
+            print(f"Skipping upload for {experiment_name} Run {i+1}.")
+
+    # Create a DataFrame from the list of results dictionaries
+    results_df = pd.DataFrame(results_list)
+
+    # Return the DataFrame containing all the results
+    return results_df
+
