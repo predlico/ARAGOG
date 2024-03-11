@@ -13,7 +13,7 @@ CHUNK_SIZE = 1000 #only for db upload
 WINDOW_SIZE = 3
 
 # Load configuration settings
-config = load_config('config.json')
+config = load_config('resources/config.json')
 openai.api_key = config['openai_api_key']
 
 # Initialize the sentence window node parser with hardcoded window size

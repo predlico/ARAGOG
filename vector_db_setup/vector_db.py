@@ -15,7 +15,7 @@ TOKEN_CHUNK_SIZE = 512
 CHUNK_OVERLAP = 50
 
 # Load the config file
-config = load_config('config.json')
+config = load_config('resources/config.json')
 openai.api_key = config['openai_api_key']
 
 # Load dataset and convert to DataFrame for easier manipulation
