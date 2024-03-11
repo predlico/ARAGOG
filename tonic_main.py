@@ -122,8 +122,56 @@ for experiment_name, query_engine in experiments.items():
     # Append the results of this experiment to the master DataFrame
     all_experiments_results_df = pd.concat([all_experiments_results_df, experiment_results_df], ignore_index=True)
 
+# Assuming all_experiments_results_df is your DataFrame
+all_experiments_results_df['RetrievalPrecision'] = all_experiments_results_df['OverallScores'].apply(lambda x: x['retrieval_precision'])
+
 # Check for normality and homogeneity of variances
 # Skipping those checks here for brevity, but you should perform them in your analysis
+
+from scipy.stats import shapiro
+
+# Test for normality for each group
+for exp in experiments.keys():
+    stat, p = shapiro(all_experiments_results_df[all_experiments_results_df['Experiment'] == exp]['RetrievalPrecision'])
+    print(f"{exp} - Normality test: Statistics={stat}, p={p}")
+    alpha = 0.05
+    if p > alpha:
+        print('Sample looks Gaussian (fail to reject H0)')
+    else:
+        print('Sample does not look Gaussian (reject H0)')
+
+from scipy.stats import levene
+
+# Test for equal variances
+stat, p = levene(*(all_experiments_results_df[all_experiments_results_df['Experiment'] == exp]['RetrievalPrecision'] for exp in experiments.keys()))
+print(f"Levene’s test: Statistics={stat}, p={p}")
+if p > alpha:
+    print('Equal variances across groups (fail to reject H0)')
+else:
+    print('Unequal variances across groups (reject H0)')
+
+import scipy
+# ANOVA
+f_value, p_value = scipy.stats.f_oneway(*(all_experiments_results_df[all_experiments_results_df['Experiment'] == exp]['RetrievalPrecision'] for exp in experiments.keys()))
+print(f"ANOVA F-Value: {f_value}, P-Value: {p_value}")
+
+# If ANOVA assumptions are not met, use Kruskal-Wallis
+# h_stat, p_value_kw = stats.kruskal(*(all_experiments_results_df[all_experiments_results_df['Experiment'] == exp]['RetrievalPrecision'] for exp in experiments.keys()))
+# print(f"Kruskal-Wallis H-Stat: {h_stat}, P-Value: {p_value_kw}")
+
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+
+# Extract just the relevant columns for easier handling
+data = all_experiments_results_df[['Experiment', 'RetrievalPrecision']]
+
+# Perform Tukey's HSD test
+tukey_result = pairwise_tukeyhsd(endog=data['RetrievalPrecision'], groups=data['Experiment'], alpha=0.05)
+print(tukey_result)
+
+# You can also plot the results to visually inspect the differences
+import matplotlib.pyplot as plt
+tukey_result.plot_simultaneous()
+plt.show()
 
 # Unfinished, needs some more love
 #### Hybrid search -----------------------------------------------------------------------------------------------------
