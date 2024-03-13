@@ -43,7 +43,7 @@ required_paper_titles = [
 required_papers = df[df['title'].isin(required_paper_titles)]
 
 # Exclude the already selected papers to avoid duplicates and randomly sample ~40-50 papers
-remaining_papers = df[~df['title'].isin(required_paper_titles)].sample(n=50)
+remaining_papers = df[~df['title'].isin(required_paper_titles)].sample(n=40, random_state=123)
 
 # Concatenate the two DataFrames
 final_df = pd.concat([required_papers, remaining_papers], ignore_index=True)
@@ -68,7 +68,9 @@ vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
 index = VectorStoreIndex(
-    nodes, storage_context=storage_context
+    nodes, storage_context=storage_context,
+    embed_model=embed_model,
+    use_async=True
 )
 
 # Sentence window
@@ -91,4 +93,36 @@ index = VectorStoreIndex(
     embed_model=embed_model,
     use_async=True
 )
+
+# Auto-merging retriever
+from llama_index.core.node_parser import (
+    HierarchicalNodeParser,
+    SentenceSplitter,
+)
+from llama_index.core.storage.docstore import SimpleDocumentStore
+from llama_index.core.node_parser import get_leaf_nodes, get_root_nodes
+
+node_parser = HierarchicalNodeParser.from_defaults()
+nodes = node_parser.get_nodes_from_documents(documents)
+len(nodes)
+leaf_nodes = get_leaf_nodes(nodes)
+len(leaf_nodes)
+root_nodes = get_root_nodes(nodes)
+chroma_collection_automerging = chroma_client.create_collection("fidy_paper_collection_automerging")
+# Define a document store and insert all nodes
+docstore = SimpleDocumentStore()
+docstore.add_documents(nodes)
+# Define the vector store using Chroma VDB
+vector_store = ChromaVectorStore(chroma_collection=chroma_collection_automerging)
+# Define storage context with both docstore and vector store
+storage_context = StorageContext.from_defaults(docstore=docstore, vector_store=vector_store)
+
+# Load leaf-level nodes into the vector index
+index = VectorStoreIndex(
+    leaf_nodes,
+    storage_context=storage_context,
+    embed_model=embed_model, # Assuming your VectorStoreIndex supports embedding models directly
+    use_async=True # Assuming async operations are supported and beneficial for your setup
+)
+
 
