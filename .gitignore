@@ -7,3 +7,4 @@
 *.pyc
 config.json
 playground.ipynb
+/chroma_db
