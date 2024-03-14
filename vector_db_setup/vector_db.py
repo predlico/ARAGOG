@@ -94,35 +94,43 @@ index = VectorStoreIndex(
     use_async=True
 )
 
-# Auto-merging retriever
-from llama_index.core.node_parser import (
-    HierarchicalNodeParser,
-    SentenceSplitter,
-)
-from llama_index.core.storage.docstore import SimpleDocumentStore
-from llama_index.core.node_parser import get_leaf_nodes, get_root_nodes
+# Document summary index
+# LLM (gpt-3.5-turbo)
+from llama_index.llms.openai import OpenAI
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core import DocumentSummaryIndex, get_response_synthesizer
 
-node_parser = HierarchicalNodeParser.from_defaults()
-nodes = node_parser.get_nodes_from_documents(documents)
-len(nodes)
-leaf_nodes = get_leaf_nodes(nodes)
-len(leaf_nodes)
-root_nodes = get_root_nodes(nodes)
-chroma_collection_automerging = chroma_client.create_collection("fidy_paper_collection_automerging")
-# Define a document store and insert all nodes
-docstore = SimpleDocumentStore()
-docstore.add_documents(nodes)
-# Define the vector store using Chroma VDB
-vector_store = ChromaVectorStore(chroma_collection=chroma_collection_automerging)
-# Define storage context with both docstore and vector store
-storage_context = StorageContext.from_defaults(docstore=docstore, vector_store=vector_store)
+# Initialize the language model
+chatgpt = OpenAI(temperature=0, model="gpt-3.5-turbo")
 
-# Load leaf-level nodes into the vector index
-index = VectorStoreIndex(
-    leaf_nodes,
-    storage_context=storage_context,
-    embed_model=embed_model, # Assuming your VectorStoreIndex supports embedding models directly
-    use_async=True # Assuming async operations are supported and beneficial for your setup
+# Initialize the sentence splitter
+splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=100)
+
+# Initialize the response synthesizer in 'tree_summarize' mode
+response_synthesizer = get_response_synthesizer(
+    response_mode="tree_summarize", use_async=False
 )
+
+# Create the collection in Chroma VDB for storing sentence window vectors
+chroma_collection_doc_summary = chroma_client.create_collection("fidy_paper_collection_doc_summary")
+
+# Initialize the ChromaVectorStore with the newly created collection
+vector_store_doc_summary = ChromaVectorStore(chroma_collection=chroma_collection_doc_summary)
+
+# Define the storage context using the vector store
+storage_context_doc_summary = StorageContext.from_defaults(vector_store=vector_store_doc_summary)
+
+# Create the document summary index
+doc_summary_index = DocumentSummaryIndex.from_documents(
+    documents,
+    llm=chatgpt,
+    transformations=[splitter],
+    response_synthesizer=response_synthesizer,
+    storage_context=storage_context_doc_summary,  # Pass the custom storage context here
+    embed_model=embed_model,
+    show_progress=True
+)
+
+
 
 
