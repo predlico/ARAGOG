@@ -38,31 +38,44 @@ index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
 chroma_collection_sentence_window = chroma_client.get_collection("fidy_paper_collection_sentence_window")
 vector_store_sentence_window = ChromaVectorStore(chroma_collection=chroma_collection_sentence_window)
 index_sentence_window = VectorStoreIndex.from_vector_store(vector_store=vector_store_sentence_window)
-# Auto-merging VDB
-chroma_collection_automerging = chroma_client.get_collection("fidy_paper_collection_automerging")
-vector_store_automerging = ChromaVectorStore(chroma_collection=chroma_collection_automerging)
-index_automerging = VectorStoreIndex.from_vector_store(vector_store=vector_store_automerging)
+# Sentence window VDB
+chroma_collection_doc_summary = chroma_client.get_collection("fidy_paper_collection_doc_summary")
+vector_store_doc_summary = ChromaVectorStore(chroma_collection=chroma_collection_doc_summary)
+index_doc_summary = VectorStoreIndex.from_vector_store(vector_store=vector_store_doc_summary)
 
 with open("resources/text_qa_template.txt", 'r', encoding='utf-8') as file:
     text_qa_template_str = file.read()
 
 text_qa_template = PromptTemplate(text_qa_template_str)
+
+
+import tiktoken
+from llama_index.core.callbacks import CallbackManager, TokenCountingHandler
+from llama_index.llms.openai import OpenAI
+from llama_index.core import Settings
+token_counter = TokenCountingHandler(
+    tokenizer=tiktoken.encoding_for_model("gpt-3.5-turbo").encode
+)
+
 # Initialize the language model with specified parameters.
 llm = OpenAI(model="gpt-3.5-turbo", temperature=0.0)
+embed_model = OpenAIEmbedding(model="text-embedding-3-large")
 
 Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-large")
 Settings.llm = OpenAI(model="gpt-3.5-turbo", temperature=0.0)
+Settings.callback_manager = CallbackManager([token_counter])
 
 benchmark = validate_api.get_benchmark(tonic_validate_benchmark_key)
 
-scorer = ValidateScorer(metrics=[RetrievalPrecisionMetric()],
+scorer = ValidateScorer(metrics=[RetrievalPrecisionMetric(), AnswerSimilarityMetric()],
                         model_evaluator="gpt-3.5-turbo")
 
 ### Define query engines -------------------------------------------------------------------------------------------------
 # Naive RAG
 query_engine_naive = index.as_query_engine(llm = llm,
                                            text_qa_template=text_qa_template,
-                                           similarity_top_k=3)
+                                           similarity_top_k=3,
+                                           embed_model = embed_model)
 
 # Cohere Rerank
 cohere_rerank = CohereRerank(api_key=config['cohere_api_key'], top_n=3)  # Ensure top_n matches k in naive RAG for comparability
@@ -70,6 +83,7 @@ query_engine_rerank = index.as_query_engine(
     similarity_top_k=10,
     text_qa_template=text_qa_template,
     node_postprocessors=[cohere_rerank],
+    embed_model = embed_model
 )
 
 # HyDE
@@ -134,7 +148,7 @@ query_engine_sentence_window_rerank = index_sentence_window.as_query_engine(
 query_engine_sentence_window_llm_rerank = index_sentence_window.as_query_engine(
     similarity_top_k=10,
     text_qa_template=text_qa_template,
-    node_postprocessors=[llm_rerank],
+    node_postprocessors=[llm_rerank]
 )
 
 # Sentence window retrieval + HyDE
@@ -145,6 +159,34 @@ query_engine_sentence_window_hyde_rerank = TransformQueryEngine(query_engine_sen
 
 # Sentence window retrieval + HyDE + LLM Rerank
 query_engine_sentence_window_hyde_llm_rerank = TransformQueryEngine(query_engine_sentence_window_llm_rerank, hyde)
+
+# Document summary index
+query_engine_doc_summary = index_doc_summary.as_query_engine(llm=llm,
+                                                             text_qa_template=text_qa_template,
+                                                             similarity_top_k=3,
+                                                             embed_model = embed_model)
+
+# HyDE + Document summary index
+query_engine_hyde_doc_summary = TransformQueryEngine(query_engine_doc_summary, hyde)
+
+# Document summary index + Cohere Rerank
+query_engine_doc_summary_rerank = index_doc_summary.as_query_engine(
+    similarity_top_k=10,
+    text_qa_template=text_qa_template,
+    node_postprocessors=[cohere_rerank],
+    embed_model = embed_model
+)
+
+# Document summary index + LLM Rerank
+query_engine_doc_summary_llm_rerank = index_doc_summary.as_query_engine(
+    similarity_top_k=10,
+    text_qa_template=text_qa_template,
+    node_postprocessors=[llm_rerank],
+    embed_model = embed_model
+)
+
+# Document summary index + HyDE + LLm Rerank
+query_engine_hyde_doc_summary_llm_rerank = TransformQueryEngine(query_engine_doc_summary_llm_rerank, hyde)
 
 ## Run experiments -------------------------------------------------------------------------------------------------------
 # Dictionary of experiments, now referencing the predefined query engine objects
@@ -161,10 +203,15 @@ experiments = {
     # "Sentence window retrieval": query_engine_sentence_window,
     # "Sentence window retrieval + Cohere rerank": query_engine_sentence_window_rerank,
     # "Sentence window retrieval + LLM Rerank": query_engine_sentence_window_llm_rerank,
-    "Sentence window retrieval + HyDE": query_engine_sentence_window_hyde,
-    "Sentence window retrieval + HyDE + Cohere Rerank": query_engine_sentence_window_hyde_rerank,
-    "Sentence window retrieval + HyDE + LLM Rerank": query_engine_sentence_window_hyde_llm_rerank
-    # Add more experiments as needed
+    # "Sentence window retrieval + HyDE": query_engine_sentence_window_hyde,
+    # "Sentence window retrieval + HyDE + Cohere Rerank": query_engine_sentence_window_hyde_rerank,
+    # "Sentence window retrieval + HyDE + LLM Rerank": query_engine_sentence_window_hyde_llm_rerank,
+    # "Document summary index": query_engine_doc_summary,
+    #  "HyDE + Document summary index": query_engine_hyde_doc_summary,
+    # "Document summary index + Cohere Rerank": query_engine_doc_summary_rerank,
+    # "Document summary index + LLM Rerank": query_engine_doc_summary_llm_rerank
+    # "HyDE + Document summary index + LLM Rerank": query_engine_hyde_doc_summary_llm_rerank
+    # Add more experiments as needed,
 }
 
 
@@ -179,7 +226,7 @@ for experiment_name, query_engine in experiments.items():
                                             benchmark,
                                             validate_api,
                                             config['tonic_validate_project_key'],
-                                            upload_results=True,
+                                            upload_results=False,
                                             runs=1)  # Adjust the number of runs as needed
 
     # Append the results of this experiment to the master DataFrame
@@ -235,4 +282,3 @@ print(tukey_result)
 import matplotlib.pyplot as plt
 tukey_result.plot_simultaneous()
 plt.show()
-
