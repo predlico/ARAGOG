@@ -100,6 +100,11 @@ from llama_index.llms.openai import OpenAI
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core import DocumentSummaryIndex, get_response_synthesizer
 
+parser = TokenTextSplitter(chunk_size=3072, chunk_overlap=100)
+splits_doc_summary = parser.get_nodes_from_documents(documents)
+
+docs_for_summary = [Document(text=splits_doc_summary.text, metadata=splits_doc_summary.metadata) for split in splits_doc_summary]
+
 # Initialize the language model
 chatgpt = OpenAI(temperature=0, model="gpt-3.5-turbo")
 
@@ -111,25 +116,17 @@ response_synthesizer = get_response_synthesizer(
     response_mode="tree_summarize", use_async=False
 )
 
-# Create the collection in Chroma VDB for storing sentence window vectors
-chroma_collection_doc_summary = chroma_client.create_collection("fidy_paper_collection_doc_summary")
-
-# Initialize the ChromaVectorStore with the newly created collection
-vector_store_doc_summary = ChromaVectorStore(chroma_collection=chroma_collection_doc_summary)
-
-# Define the storage context using the vector store
-storage_context_doc_summary = StorageContext.from_defaults(vector_store=vector_store_doc_summary)
-
 # Create the document summary index
 doc_summary_index = DocumentSummaryIndex.from_documents(
-    documents,
+    nodes[0:10],
     llm=chatgpt,
     transformations=[splitter],
     response_synthesizer=response_synthesizer,
-    storage_context=storage_context_doc_summary,  # Pass the custom storage context here
     embed_model=embed_model,
     show_progress=True
 )
+
+doc_summary_index.storage_context.persist("Obelix")
 
 
 

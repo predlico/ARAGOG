@@ -2,6 +2,7 @@ import json
 import pandas as pd
 def remove_nul_chars_from_string(s):
     """Remove NUL characters from a single string."""
+    """ Nece """
     return s.replace('\x00', '')
 
 def remove_nul_chars_from_run_data(run_data):
@@ -15,7 +16,8 @@ def remove_nul_chars_from_run_data(run_data):
 def make_get_llama_response(query_engine):
     def get_llama_response(prompt):
         print(prompt)
-        response = query_engine.query(prompt)
+        time.sleep(5)
+        response = query_engine_doc_summary.query(prompt)
         context = [x.text for x in response.source_nodes]
         return {
             "llm_answer": response.response,
