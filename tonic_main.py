@@ -13,6 +13,7 @@ from llama_index.core.postprocessor import LLMRerank
 from llama_index.core.retrievers import QueryFusionRetriever
 from tonic_validate import ValidateScorer, ValidateApi
 from tonic_validate.metrics import RetrievalPrecisionMetric, AnswerSimilarityMetric
+from ExponentialBackoffFix.scorer_backoff_ValidateScorer import ValidateScorerBackoff
 ### SETUP --------------------------------------------------------------------------------------------------------------
 # Load the config file
 config = load_config('resources/config.json')
@@ -63,7 +64,7 @@ text_qa_template = PromptTemplate(text_qa_template_str)
 
 # Tonic Validate setup
 benchmark = validate_api.get_benchmark(tonic_validate_benchmark_key)
-scorer = ValidateScorer(metrics=[RetrievalPrecisionMetric(), AnswerSimilarityMetric()],
+scorer = ValidateScorerBackoff(metrics=[RetrievalPrecisionMetric(), AnswerSimilarityMetric()],
                         model_evaluator="gpt-3.5-turbo")
 
 ### Define query engines -------------------------------------------------------------------------------------------------
