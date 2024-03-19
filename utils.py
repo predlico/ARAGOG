@@ -1,9 +1,10 @@
 import json
+import time
+
 import pandas as pd
 import time
 def remove_nul_chars_from_string(s):
     """Remove NUL characters from a single string."""
-    """ Nece """
     return s.replace('\x00', '')
 
 def remove_nul_chars_from_run_data(run_data):
@@ -16,10 +17,16 @@ def remove_nul_chars_from_run_data(run_data):
 
 def make_get_llama_response(query_engine):
     def get_llama_response(prompt):
-        print(prompt)
-        time.sleep(5)
+        # print(prompt)
         response = query_engine.query(prompt)
-        context = [x.text for x in response.source_nodes]
+        context = []
+        for x in response.source_nodes:
+            # Initialize context string with the text of the node
+            node_context = x.text
+            # Check if 'window' metadata exists and append it to the context
+            if 'window' in x.metadata:
+                node_context += "\n\nWindow Context:\n" + x.metadata['window']
+            context.append(node_context)
         return {
             "llm_answer": response.response,
             "llm_context_list": context
@@ -49,8 +56,8 @@ def run_experiment(experiment_name, query_engine, scorer, benchmark, validate_ap
         get_llama_response_func = make_get_llama_response(query_engine)
         run = scorer.score(benchmark,
                            get_llama_response_func,
-                           callback_parallelism=3,
-                           scoring_parallelism=3)
+                           callback_parallelism=1,
+                           scoring_parallelism=1)
         print(f"{experiment_name} Run {i+1} Overall Scores:", run.overall_scores)
         remove_nul_chars_from_run_data(run.run_data)
 

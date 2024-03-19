@@ -28,6 +28,9 @@ validate_api = ValidateApi(tonic_validate_api_key)
 # Service context
 llm = OpenAI(model="gpt-3.5-turbo", temperature=0.0)
 embed_model = OpenAIEmbedding(model="text-embedding-3-large")
+from llama_index.core import Settings
+
+Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-large")
 service_context = ServiceContext.from_defaults(llm = llm, embed_model = embed_model)
 
 chroma_client = chromadb.PersistentClient(path="./chroma_db")
@@ -42,19 +45,11 @@ index_sentence_window = VectorStoreIndex.from_vector_store(vector_store=vector_s
 # Document summary VDB
 from llama_index.core import load_index_from_storage
 from llama_index.core import StorageContext
-from llama_index.core.node_parser import SentenceSplitter
-from llama_index.core import get_response_synthesizer
-# Initialize the sentence splitter
-splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=100)
-# Initialize the response synthesizer in 'tree_summarize' mode
-response_synthesizer = get_response_synthesizer(
-    response_mode="tree_summarize", use_async=False
-)
-# Cre
-storage_context = StorageContext.from_defaults(persist_dir="Obelix")
+# storage_context = StorageContext.from_defaults(persist_dir="Obelix")
+storage_context = StorageContext.from_defaults(persist_dir="New_splits_doc_summary")
 doc_summary_index = load_index_from_storage(llm=llm,
-                                              storage_context=storage_context
-                                              )
+                                              storage_context=storage_context,
+                                             embed_model = embed_model)
 
 # Prompt template
 with open("resources/text_qa_template.txt", 'r', encoding='utf-8') as file:
@@ -64,14 +59,15 @@ text_qa_template = PromptTemplate(text_qa_template_str)
 
 # Tonic Validate setup
 benchmark = validate_api.get_benchmark(tonic_validate_benchmark_key)
-scorer = ValidateScorerBackoff(metrics=[RetrievalPrecisionMetric(), AnswerSimilarityMetric()],
+scorer = ValidateScorer(metrics=[RetrievalPrecisionMetric(), AnswerSimilarityMetric()],
                         model_evaluator="gpt-3.5-turbo")
 
 ### Define query engines -------------------------------------------------------------------------------------------------
 # Naive RAG
-query_engine_naive = index.as_query_engine(service_context = service_context,
+query_engine_naive = index.as_query_engine(llm = llm,
                                            text_qa_template=text_qa_template,
-                                           similarity_top_k=3)
+                                           similarity_top_k=3,
+                                           embed_model=embed_model)
 
 # Cohere Rerank
 cohere_rerank = CohereRerank(api_key=config['cohere_api_key'], top_n=3)  # Ensure top_n matches k in naive RAG for comparability
@@ -79,7 +75,8 @@ query_engine_rerank = index.as_query_engine(
     similarity_top_k=10,
     text_qa_template=text_qa_template,
     node_postprocessors=[cohere_rerank],
-    service_context = service_context
+    llm = llm,
+    embed_model=embed_model
 )
 
 # HyDE
@@ -92,7 +89,8 @@ query_engine_hyde_rerank = TransformQueryEngine(query_engine_rerank, hyde)
 # Maximal Marginal Relevance (MMR)
 query_engine_mmr = index.as_query_engine(vector_store_query_mode="mmr",
                                          similarity_top_k=3,
-                                         service_context = service_context)
+                                          embed_model=embed_model,
+                                          llm=llm)
 
 # Multi Query
 vector_retriever = index.as_retriever(similarity_top_k=3)
@@ -107,7 +105,8 @@ retriever_multi_query = QueryFusionRetriever(
 )
 query_engine_multi_query = RetrieverQueryEngine.from_args(retriever_multi_query,
                                                           verbose=True,
-                                                          service_context = service_context)
+                                                          embed_model=embed_model,
+                                                          llm=llm)
 
 # Multi Query + Cohere rerank + simple fusion
 retriever_multi_query_rerank = QueryFusionRetriever(
@@ -122,7 +121,8 @@ retriever_multi_query_rerank = QueryFusionRetriever(
 query_engine_multi_query_rerank = RetrieverQueryEngine.from_args(retriever_multi_query_rerank,
                                                                  verbose=True,
                                                                  node_postprocessors=[cohere_rerank],
-                                                                 service_context = service_context)
+                                                                 embed_model=embed_model,
+                                                                 llm=llm)
 
 ## LLM Rerank
 llm_rerank = LLMRerank(choice_batch_size=10, top_n=3)
@@ -130,7 +130,8 @@ query_engine_llm_rerank = index.as_query_engine(
     similarity_top_k=10,
     text_qa_template=text_qa_template,
     node_postprocessors=[llm_rerank],
-    service_context = service_context
+    embed_model=embed_model,
+    llm=llm
 )
 # HyDE + LLM Rerank
 query_engine_hyde_llm_rerank = TransformQueryEngine(query_engine_llm_rerank, hyde)
@@ -138,14 +139,16 @@ query_engine_hyde_llm_rerank = TransformQueryEngine(query_engine_llm_rerank, hyd
 # Sentence window retrieval
 query_engine_sentence_window = index_sentence_window.as_query_engine(text_qa_template=text_qa_template,
                                                                      similarity_top_k=3,
-                                                                     service_context = service_context)
+                                                                      embed_model=embed_model,
+                                                                      llm=llm)
 
 # Sentence window retrieval + Cohere rerank
 query_engine_sentence_window_rerank = index_sentence_window.as_query_engine(
     similarity_top_k=10,
     text_qa_template=text_qa_template,
     node_postprocessors=[cohere_rerank],
-    service_context = service_context
+    embed_model=embed_model,
+    llm=llm
 )
 
 # Sentence window retrieval + LLM Rerank
@@ -153,8 +156,8 @@ query_engine_sentence_window_llm_rerank = index_sentence_window.as_query_engine(
     similarity_top_k=10,
     text_qa_template=text_qa_template,
     node_postprocessors=[llm_rerank],
-    service_context = service_context
-)
+    embed_model=embed_model,
+    llm=llm)
 
 # Sentence window retrieval + HyDE
 query_engine_sentence_window_hyde = TransformQueryEngine(query_engine_sentence_window, hyde)
@@ -165,72 +168,12 @@ query_engine_sentence_window_hyde_rerank = TransformQueryEngine(query_engine_sen
 # Sentence window retrieval + HyDE + LLM Rerank
 query_engine_sentence_window_hyde_llm_rerank = TransformQueryEngine(query_engine_sentence_window_llm_rerank, hyde)
 
-# Document summary index
-query_engine_doc_summary = doc_summary_index.as_query_engine(
-    response_mode="tree_summarize",
-    use_async=True,
-    text_qa_template=text_qa_template,
-    similarity_top_k=3,
-    service_context = service_context,
-    verbose=True
-)
-
-from llama_index.core.indices.document_summary import (
-    DocumentSummaryIndexEmbeddingRetriever
-)
-retriever = DocumentSummaryIndexEmbeddingRetriever(
-    doc_summary_index,
-    similarity_top_k=5
-)
-
-# use retriever as part of a query engine
-from llama_index.core.query_engine import RetrieverQueryEngine
-
-# configure response synthesizer
-response_synthesizer = get_response_synthesizer(response_mode="tree_summarize")
-
-# assemble query engine
-query_engine = RetrieverQueryEngine(
-    retriever=retriever,
-    response_synthesizer=response_synthesizer
-
-)
-
-# query
-response = query_engine.query("What is fine-tuning??")
-print(response)
-len(response.source_nodes)
-
-
-
-
-
-
-query_engine_doc_summary = index_doc_summary.as_query_engine(text_qa_template=text_qa_template,
-                                                             similarity_top_k=3,
-                                                             service_context = service_context)
-
-# HyDE + Document summary index
-query_engine_hyde_doc_summary = TransformQueryEngine(query_engine_doc_summary, hyde)
-
 # Document summary index + Cohere Rerank
-query_engine_doc_summary_rerank = index_doc_summary.as_query_engine(
-    similarity_top_k=10,
+query_engine_doc_summary_rerank = doc_summary_index.as_query_engine(
+    similarity_top_k=5,
     text_qa_template=text_qa_template,
     node_postprocessors=[cohere_rerank],
-    service_context=service_context
-)
-
-# Document summary index + LLM Rerank
-query_engine_doc_summary_llm_rerank = index_doc_summary.as_query_engine(
-    similarity_top_k=10,
-    text_qa_template=text_qa_template,
-    node_postprocessors=[llm_rerank],
-    service_context = service_context
-)
-
-# Document summary index + HyDE + LLm Rerank
-query_engine_hyde_doc_summary_llm_rerank = TransformQueryEngine(query_engine_doc_summary_llm_rerank, hyde)
+    llm=llm)
 
 # Document summary index + HyDE + Cohere Rerank
 query_engine_hyde_doc_summary_rerank = TransformQueryEngine(query_engine_doc_summary_rerank, hyde)
@@ -238,27 +181,23 @@ query_engine_hyde_doc_summary_rerank = TransformQueryEngine(query_engine_doc_sum
 ## Run experiments -------------------------------------------------------------------------------------------------------
 # Dictionary of experiments, now referencing the predefined query engine objects
 experiments = {
-    # "Classic VDB + Naive RAG": query_engine_naive,
-    # "Classic VDB + Cohere Rerank": query_engine_rerank
+    "Classic VDB + Naive RAG": query_engine_naive,
+    "Classic VDB + Cohere Rerank": query_engine_rerank,
     "Classic VDB + LLM Rerank": query_engine_llm_rerank,
-    # "Classic VDB + HyDE": query_engine_hyde,
-    # "Classic VDB + HyDE + Cohere Rerank": query_engine_hyde_rerank,
-    # "Classic VDB + HyDE + LLM Rerank": query_engine_hyde_llm_rerank
-    # "Classic VDB + Maximal Marginal Relevance (MMR)": query_engine_mmr,
-    # "Classic VDB + Multi Query": query_engine_multi_query,
-    # "Classic VDB + Multi Query + Cohere rerank": query_engine_multi_query_rerank,
-    # "Sentence window retrieval": query_engine_sentence_window,
-    # "Sentence window retrieval + Cohere rerank": query_engine_sentence_window_rerank,
-    # "Sentence window retrieval + LLM Rerank": query_engine_sentence_window_llm_rerank,
-    # "Sentence window retrieval + HyDE": query_engine_sentence_window_hyde,
+    "Classic VDB + HyDE": query_engine_hyde,
+    "Classic VDB + HyDE + Cohere Rerank": query_engine_hyde_rerank,
+    "Classic VDB + HyDE + LLM Rerank": query_engine_hyde_llm_rerank,
+    "Classic VDB + Maximal Marginal Relevance (MMR)": query_engine_mmr,
+    "Classic VDB + Multi Query + Reciprocal": query_engine_multi_query,
+    "Classic VDB + Multi Query + Cohere rerank": query_engine_multi_query_rerank,
+    "Sentence window retrieval": query_engine_sentence_window,
+    "Sentence window retrieval + Cohere rerank": query_engine_sentence_window_rerank,
+    "Sentence window retrieval + LLM Rerank": query_engine_sentence_window_llm_rerank,
+    "Sentence window retrieval + HyDE": query_engine_sentence_window_hyde,
     "Sentence window retrieval + HyDE + Cohere Rerank": query_engine_sentence_window_hyde_rerank,
-    # "Sentence window retrieval + HyDE + LLM Rerank": query_engine_sentence_window_hyde_llm_rerank,
-    "Document summary index": query_engine_doc_summary
-    # "Document summary index + Cohere Rerank": query_engine_doc_summary_rerank,
-    # "Document summary index + LLM Rerank": query_engine_doc_summary_llm_rerank
-    # "Document summary index + HyDE": query_engine_hyde_doc_summary,
-    # "Document summary index + HyDE + Cohere Rerank": query_engine_hyde_doc_summary_rerank
-    # "Document summary index + HyDE + LLM Rerank": query_engine_hyde_doc_summary_llm_rerank
+    "Sentence window retrieval + HyDE + LLM Rerank": query_engine_sentence_window_hyde_llm_rerank,
+    "Document summary index + Cohere Rerank": query_engine_doc_summary_rerank,
+    "Document summary index + HyDE + Cohere Rerank": query_engine_hyde_doc_summary_rerank
 }
 
 
@@ -274,7 +213,7 @@ for experiment_name, query_engine in experiments.items():
                                             validate_api,
                                             config['tonic_validate_project_key'],
                                             upload_results=True,
-                                            runs=3)  # Adjust the number of runs as needed
+                                            runs=1)  # Adjust the number of runs as needed
 
     # Append the results of this experiment to the master DataFrame
     all_experiments_results_df = pd.concat([all_experiments_results_df, experiment_results_df], ignore_index=True)

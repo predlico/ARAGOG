@@ -103,7 +103,7 @@ from llama_index.core import DocumentSummaryIndex, get_response_synthesizer
 parser = TokenTextSplitter(chunk_size=3072, chunk_overlap=100)
 splits_doc_summary = parser.get_nodes_from_documents(documents)
 
-docs_for_summary = [Document(text=splits_doc_summary.text, metadata=splits_doc_summary.metadata) for split in splits_doc_summary]
+docs_for_summary = [Document(text=node.text, metadata=node.metadata) for node in splits_doc_summary]
 
 # Initialize the language model
 chatgpt = OpenAI(temperature=0, model="gpt-3.5-turbo")
@@ -118,7 +118,7 @@ response_synthesizer = get_response_synthesizer(
 
 # Create the document summary index
 doc_summary_index = DocumentSummaryIndex.from_documents(
-    nodes[0:10],
+    docs_for_summary,
     llm=chatgpt,
     transformations=[splitter],
     response_synthesizer=response_synthesizer,
@@ -126,7 +126,7 @@ doc_summary_index = DocumentSummaryIndex.from_documents(
     show_progress=True
 )
 
-doc_summary_index.storage_context.persist("Obelix")
+doc_summary_index.storage_context.persist("New_splits_doc_summary")
 
 
 
