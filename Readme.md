@@ -1,58 +1,34 @@
-# ARAGOG - Advanced Retrieval Augmented Generation Output Grading :spider:
+# Advanced RAG Techniques Evaluation Repository
 
-This repository contains code and resources for our RAG (Retrieval-Augmented Generation) experiments. We are comparing different RAG approaches on the same dataset.
+This repository contains the code, data, and analysis for our study on advanced Retrieval-Augmented Generation (RAG) techniques. It's part of our scientific paper investigating the efficacy of various RAG techniques in enhancing the precision and contextual relevance of LLMs.
 
-## General Guidelines
+## Repository Structure
 
-- Keep the code modular. This allows us to experiment more easily and potentially re-use the code for our client projects.
+- `eval_questions/`: Contains a JSON file with 107 QA pairs used in the evaluation.
+- `papers_for_questions/`: Holds a collection of AI-ArXiv papers that were utilized for creating the 107 QA pairs.
+- `resources/`: Includes essential resources like the prompt template and configuration files. Note: Actual config files need API keys and other settings to be filled out.
+- `main.py`: The main script where experiments are defined and executed.
+- `res_analysis.ipynb`: A Jupyter notebook for in-depth analysis of the final experimental results.
+- `utils.py`: Helper functions supporting various operations within the repository.
+- `vector_db.py`: Scripts for setting up different vector databases, such as Classic VDB, Sentence-window, and Document Summary.
+- `final_results.xlsx`: Spreadsheet containing the final results from our experiments, shared for transparency and scientific verification.
 
-## Pre-Coding Tasks
+## Getting Started
 
-### Dataset Selection
+To replicate our experiments or to analyze our results, please ensure to fill in the necessary API keys and other configurations by renaming `config_template.json` to `config.json` and completing the required fields.
 
-We have selected a dataset of [AI papers from arXiv](https://huggingface.co/datasets/jamescalam/ai-arxiv) for our experiments.
+## Results examination
 
-### Evaluation Framework Selection
+The `res_analysis.ipynb` notebook provides a detailed examination of the experimental results stored in `final_results.xlsx`. 
 
-We have chosen [Trulens](https://www.trulens.org/) as our evaluation framework.
+## Full replication
 
-## Stack
+To set up vector databases for experiments, run the `vector_db.py` script. Subsequently, execute `main.py` to perform the experiments. Post-experimentation, use `res_analysis.ipynb` for analyzing the results. Helper functions in `utils.py` are employed across scripts to streamline processes.
 
-We will be utilizing LLaMAIndex wherever possible as our primary RAG stack. For approaches not encompassed by LLaMAIndex, we will be developing our own custom code.
+## Contribution
 
-## Coding Tasks
+Contributions are welcome. For any changes or enhancements, please open an issue first to discuss what you would like to change.
 
-The tasks include setting up multiple vector databases and creating questions. The same set of questions will be evaluated across different types of RAG.
+## License
 
-## Techniques to Run
-
-We will be running the following techniques:
-
-- Sentence-window retrieval
-- Auto-merging retrieval
-- Query expansion - hallucinate output
-- Query expansion - create similar questions
-- Reranker
-- Fine-tune reranker
-- Step back prompting
-- Maximum marginal relevance
-- Embedding adapters
-- Hybrid search (multiple vectordbs, one sentences, one n-grams, one paragraphs..)
-
-## Order of Operations
-
-1. Step back prompting
-2. Reranker
-3. Query expansion - hallucinate output
-4. Query expansion - create similar questions
-5. Maximum marginal relevance
-
-## Time Intensive Techniques
-
-- Embedding adapters
-- Fine-tune reranker
-
-## Techniques that Might Require Re-indexing
-
-- Sentence-window retrieval
-- Auto-merging retrieval
+This project is open-source and available under the [MIT License](LICENSE).
