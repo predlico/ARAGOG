@@ -1,6 +1,6 @@
-# Advanced RAG Techniques Evaluation Repository
+# ARAGOG - Advanced Retrieval Augmented Generation Output Grading :spider:
 
-This repository contains the code, data, and analysis for our study on advanced Retrieval-Augmented Generation (RAG) techniques. It's part of our scientific paper investigating the efficacy of various RAG techniques in enhancing the precision and contextual relevance of LLMs.
+This repository contains the code, data, and analysis for our study [link later] on advanced Retrieval-Augmented Generation (RAG) techniques. It's part of our scientific paper investigating the efficacy of various RAG techniques in enhancing the precision and contextual relevance of LLMs.
 
 ## Repository Structure
 
