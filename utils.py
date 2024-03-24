@@ -75,3 +75,25 @@ def run_experiment(experiment_name, query_engine, scorer, benchmark, validate_ap
     # Return the DataFrame containing all the results
     return results_df
 
+def filter_large_nodes(nodes, max_length=8000):
+    """
+    Filters out nodes with 'window' or 'text' length greater than max_length.
+    Needed bcs sometimes the sentences are too long due to tables or refereneces in data.
+    It creates one giga long non-sensical sentence. Before filtering please do analysis
+    so that you dont throw out anything important.
+
+    Args:
+    - nodes (list): List of node objects.
+    - max_length (int): Maximum allowed length for 'window' and 'text'.
+
+    Returns:
+    - list: Filtered list of nodes.
+    """
+    filtered_nodes = []
+    for node in nodes:
+        text_length = len(node.text)
+        window_length = len(node.metadata.get('window', ''))
+
+        if text_length <= max_length and window_length <= max_length:
+            filtered_nodes.append(node)
+    return filtered_nodes
