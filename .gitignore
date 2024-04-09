@@ -10,3 +10,9 @@ playground.ipynb
 /Obelix
 /New_splits_doc_summary
 /ai_arxiv_doc_summary
+
+# secure API keys
+.env
+# for virtual env python
+venv/
+.python-version

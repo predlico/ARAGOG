@@ -15,7 +15,13 @@ This repository contains the code, data, and analysis for our study [link later]
 
 ## Getting Started
 
-To replicate our experiments or to analyze our results, please ensure to fill in the necessary API keys and other configurations by renaming `config_template.json` to `config.json` and completing the required fields.
+To replicate our experiments or to analyze our results, please ensure to fill in the necessary API keys and other configurations by creating a `.env` file (see `.sample.env`) - the `.env` is ignored in .gitignore for security.
+
+Setup the python environment using either `venv` or `pyenv` or your favourite python environment amanger. Call the environment `aragog` or anything you like. 
+- `python3 -m venv aragog` and activate it using `source venv/bin/activate` (Mac/Linux) or `venv\Scripts\activate` (Windows).
+- OR `pyenv` with `pyenv virtualenv 3.12 aragog`, then activate with `pyenv local aragog`. 
+
+Then run `pip install -r requirements.txt` to install all necessary dependencies.
 
 ## Results examination
 

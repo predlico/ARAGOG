@@ -1,8 +1,9 @@
-import json
-import time
-
 import pandas as pd
 import time
+
+from dotenv import load_dotenv
+import os
+
 def remove_nul_chars_from_string(s):
     """Remove NUL characters from a single string."""
     return s.replace('\x00', '')
@@ -39,14 +40,10 @@ def chunked_iterable(iterable, size):
         yield iterable[i:i + size]
 
 # Function to load and validate configuration settings
-def load_config(config_path):
-    with open(config_path) as config_file:
-        config = json.load(config_file)
-    # Example validation, extend as needed
-    required_keys = ['openai_api_key', 'qdrant_url', 'qdrant_api_key']
-    if not all(key in config for key in required_keys):
-        raise ValueError("Config file is missing required keys.")
-    return config
+def load_config():
+    # Load environment variables from a .env file
+    load_dotenv()
+
 
 def run_experiment(experiment_name, query_engine, scorer, benchmark, validate_api, project_key, upload_results=True, runs=5):
     # List to store results dictionaries

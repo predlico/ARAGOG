@@ -13,15 +13,16 @@ from llama_index.core.postprocessor import LLMRerank
 from llama_index.core.retrievers import QueryFusionRetriever
 from tonic_validate import ValidateScorer, ValidateApi
 from tonic_validate.metrics import RetrievalPrecisionMetric, AnswerSimilarityMetric
+import os
 ### SETUP --------------------------------------------------------------------------------------------------------------
-# Load the config file
-config = load_config('resources/config.json')
+# Load the config file (.env vars)
+load_config()
 
 # Set the OpenAI API key for authentication.
-openai.api_key = config['openai_api_key']
-tonic_validate_api_key = config['tonic_validate_api_key']
-tonic_validate_project_key = config['tonic_validate_project_key']
-tonic_validate_benchmark_key = config['tonic_validate_benchmark_key']
+openai.api_key = os.getenv("OPENAI_API_KEY")
+tonic_validate_api_key = os.getenv("TONIC_VALIDATE_API_KEY")
+tonic_validate_project_key = os.getenv("TONIC_VALIDATE_PROJECT_KEY")
+tonic_validate_benchmark_key = os.getenv("TONIC_VALIDATE_BENCHMARK_KEY")
 validate_api = ValidateApi(tonic_validate_api_key)
 
 # Service context

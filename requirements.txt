@@ -1,0 +1,9 @@
+llama-index-vector-stores-chroma
+llama-index-postprocessor-cohere-rerank
+llama-index
+pandas
+datasets
+chromadb
+python-dotenv
+tonic_validate
+cohere

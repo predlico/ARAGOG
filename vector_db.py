@@ -9,6 +9,7 @@ from llama_index.core.node_parser import TokenTextSplitter
 from utils import chunked_iterable, load_config
 from llama_index.vector_stores.chroma import ChromaVectorStore
 import openai
+import os
 
 # Hardcoded values for easy adjustment
 CHUNK_SIZE = 1000 #only for db upload
@@ -16,8 +17,8 @@ TOKEN_CHUNK_SIZE = 512
 CHUNK_OVERLAP = 50
 
 # Load the config file
-config = load_config('resources/config.json')
-openai.api_key = config['openai_api_key']
+load_config()
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Load dataset and convert to DataFrame for easier manipulation
 dataset = load_dataset("jamescalam/ai-arxiv")
